@@ -10,37 +10,14 @@ async function bootstrap() {
 
   const app = await NestFactory.create(AppModule);
 
-  // ✅ FORCE CORS + PREFLIGHT FIX
   app.enableCors({
-    origin: '*',
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: '*',
+    origin: [
+      'http://localhost:5173',
+      'https://fintrackr-frontend.vercel.app',
+    ],
+    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+    credentials: true,
   });
-
-  // 🔥 IMPORTANT: handle preflight manually (fixes your exact error)
-  app.use(
-    (
-      req: { method: string },
-      res: {
-        header: (arg0: string, arg1: string) => void;
-        sendStatus: (arg0: number) => any;
-      },
-      next: () => void,
-    ) => {
-      res.header('Access-Control-Allow-Origin', '*');
-      res.header(
-        'Access-Control-Allow-Methods',
-        'GET,POST,PUT,PATCH,DELETE,OPTIONS',
-      );
-      res.header('Access-Control-Allow-Headers', '*');
-
-      if (req.method === 'OPTIONS') {
-        return res.sendStatus(200); // 👈 THIS FIXES PREFLIGHT
-      }
-
-      next();
-    },
-  );
 
   app.useGlobalPipes(
     new ValidationPipe({

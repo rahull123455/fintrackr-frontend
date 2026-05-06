@@ -163,7 +163,7 @@ button {
 .metric-strip {
   display: grid;
   gap: 1rem;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
 }
 
 .metric-strip article {
@@ -322,7 +322,7 @@ textarea:disabled {
 .analytics-grid {
   display: grid;
   gap: 1rem;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
 }
 
 .analytics-card,
@@ -395,7 +395,7 @@ textarea:disabled {
 .savings-meta-grid {
   display: grid;
   gap: 0.75rem;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   margin-top: 1rem;
 }
 
