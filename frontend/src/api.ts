@@ -5,10 +5,13 @@ import type {
   ContactInquiryInput,
   AuthResponse,
   AuthUser,
+  LoginResponse,
   Expense,
   ExpenseInput,
   SavingsGoal,
   SavingsGoalInput,
+  TwoFactorSetupResponse,
+  TwoFactorVerifyResponse,
 } from './types';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
@@ -58,9 +61,42 @@ export const api = {
   },
 
   login(email: string, password: string) {
-    return request<AuthResponse>('/auth/login', {
+    return request<LoginResponse>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
+    });
+  },
+
+  generateTwoFactor(token: string) {
+    return request<TwoFactorSetupResponse>(
+      '/auth/2fa/generate',
+      { method: 'POST' },
+      token,
+    );
+  },
+
+  enableTwoFactor(token: string, otpCode: string) {
+    return request<{ success: boolean }>(
+      '/auth/2fa/enable',
+      {
+        method: 'POST',
+        body: JSON.stringify({ otpCode }),
+      },
+      token,
+    );
+  },
+
+  verifyTwoFactor(tempToken: string, otpCode: string) {
+    return request<TwoFactorVerifyResponse>('/auth/2fa/verify', {
+      method: 'POST',
+      body: JSON.stringify({ otpCode, tempToken }),
+    });
+  },
+
+  loginWithTwoFactor(tempToken: string, otpCode: string) {
+    return request<AuthResponse>('/auth/2fa/login', {
+      method: 'POST',
+      body: JSON.stringify({ otpCode, tempToken }),
     });
   },
 

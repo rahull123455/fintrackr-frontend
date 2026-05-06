@@ -1,13 +1,33 @@
 export type AuthUser = {
   id: string;
   email: string;
+  twoFactorEnabled: boolean;
   createdAt?: string;
   updatedAt?: string;
 };
 
-export type AuthResponse = {
+export type AuthSuccessResponse = {
   accessToken: string;
   user: AuthUser;
+};
+
+export type TwoFactorChallengeResponse = {
+  requiresTwoFactor: true;
+  tempToken: string;
+};
+
+export type AuthResponse = AuthSuccessResponse;
+
+export type LoginResponse = AuthSuccessResponse | TwoFactorChallengeResponse;
+
+export type TwoFactorSetupResponse = {
+  otpauthUrl: string;
+  qrCodeDataUrl: string;
+  secret: string;
+};
+
+export type TwoFactorVerifyResponse = {
+  valid: boolean;
 };
 
 export type Expense = {

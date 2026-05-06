@@ -5,15 +5,20 @@ import { SiteFooter } from './components/SiteFooter';
 import type {
   AiPredictionResponse,
   AiPredictionTrend,
-  AuthResponse,
+  AuthSuccessResponse,
   AuthUser,
   Expense,
   ExpenseInput,
   SavingsGoal,
   SavingsGoalInput,
+  TwoFactorSetupResponse,
 } from './types';
 
 const tokenStorageKey = 'fintrackr-token';
+const themeStorageKey = 'fintrackr-theme';
+const themeModes = ['system', 'light', 'dark'] as const;
+
+type ThemeMode = (typeof themeModes)[number];
 
 const categories = [
   'Food',
@@ -81,15 +86,56 @@ function sortSavingsGoals(goals: SavingsGoal[]) {
   );
 }
 
+function isThemeMode(value: string | null): value is ThemeMode {
+  return value === 'light' || value === 'dark' || value === 'system';
+}
+
+function getResolvedTheme(
+  themeMode: ThemeMode,
+  prefersDark: boolean,
+): 'light' | 'dark' {
+  if (themeMode === 'system') {
+    return prefersDark ? 'dark' : 'light';
+  }
+
+  return themeMode;
+}
+
+function getThemeIcon(themeMode: ThemeMode) {
+  switch (themeMode) {
+    case 'light':
+      return '☀️';
+    case 'dark':
+      return '🌙';
+    default:
+      return '🖥️';
+  }
+}
+
+function normalizeOtpCode(value: string) {
+  return value.replace(/\D/g, '').slice(0, 6);
+}
+
 function App() {
   const [mode, setMode] = useState<'login' | 'signup'>('signup');
   const [token, setToken] = useState<string | null>(
     () => window.localStorage.getItem(tokenStorageKey),
   );
+  const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
+    const savedTheme = window.localStorage.getItem(themeStorageKey);
+    return isThemeMode(savedTheme) ? savedTheme : 'system';
+  });
   const [user, setUser] = useState<AuthUser | null>(null);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
+  const [pendingTwoFactorToken, setPendingTwoFactorToken] = useState<
+    string | null
+  >(null);
+  const [pendingTwoFactorEmail, setPendingTwoFactorEmail] = useState('');
+  const [loginOtpCode, setLoginOtpCode] = useState('');
+  const [loginOtpError, setLoginOtpError] = useState('');
+  const [loginOtpLoading, setLoginOtpLoading] = useState(false);
   const [expenseForm, setExpenseForm] = useState({
     title: '',
     amount: '',
@@ -118,6 +164,37 @@ function App() {
   const [predictionError, setPredictionError] = useState('');
   const [predictionLoading, setPredictionLoading] = useState(false);
   const [predictionRefreshing, setPredictionRefreshing] = useState(false);
+  const [twoFactorSetup, setTwoFactorSetup] =
+    useState<TwoFactorSetupResponse | null>(null);
+  const [twoFactorCode, setTwoFactorCode] = useState('');
+  const [twoFactorError, setTwoFactorError] = useState('');
+  const [twoFactorGenerating, setTwoFactorGenerating] = useState(false);
+  const [twoFactorEnabling, setTwoFactorEnabling] = useState(false);
+
+  useEffect(() => {
+    window.localStorage.setItem(themeStorageKey, themeMode);
+  }, [themeMode]);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+
+    const applyTheme = () => {
+      const resolvedTheme = getResolvedTheme(themeMode, mediaQuery.matches);
+      document.documentElement.setAttribute('data-theme', resolvedTheme);
+    };
+
+    applyTheme();
+
+    if (themeMode !== 'system') {
+      return;
+    }
+
+    mediaQuery.addEventListener('change', applyTheme);
+
+    return () => {
+      mediaQuery.removeEventListener('change', applyTheme);
+    };
+  }, [themeMode]);
 
   useEffect(() => {
     if (!token) {
@@ -250,12 +327,16 @@ function App() {
     };
   }, [bootstrapping, token, user]);
 
-  function persistAuth(auth: AuthResponse) {
+  function persistAuth(auth: AuthSuccessResponse) {
     window.localStorage.setItem(tokenStorageKey, auth.accessToken);
     setToken(auth.accessToken);
     setUser(auth.user);
     setAuthPassword('');
     setAuthError('');
+    setPendingTwoFactorToken(null);
+    setPendingTwoFactorEmail('');
+    setLoginOtpCode('');
+    setLoginOtpError('');
     setBootstrapping(true);
   }
 
@@ -266,10 +347,21 @@ function App() {
     setExpenses([]);
     setSavingsGoals([]);
     setPrediction(null);
+    setAuthPassword('');
     setAuthError('');
     setExpenseError('');
     setSavingsError('');
     setPredictionError('');
+    setPendingTwoFactorToken(null);
+    setPendingTwoFactorEmail('');
+    setLoginOtpCode('');
+    setLoginOtpError('');
+    setTwoFactorSetup(null);
+    setTwoFactorCode('');
+    setTwoFactorError('');
+    setTwoFactorGenerating(false);
+    setTwoFactorEnabling(false);
+    setBootstrapping(false);
   }
 
   async function handleAuthSubmit(event: FormEvent<HTMLFormElement>) {
@@ -278,13 +370,107 @@ function App() {
     setAuthError('');
 
     try {
-      const action = mode === 'signup' ? api.signup : api.login;
-      const auth = await action(authEmail, authPassword);
-      persistAuth(auth);
+      if (mode === 'signup') {
+        const auth = await api.signup(authEmail, authPassword);
+        persistAuth(auth);
+        return;
+      }
+
+      const auth = await api.login(authEmail, authPassword);
+
+      if ('accessToken' in auth) {
+        persistAuth(auth);
+        return;
+      }
+
+      if (auth.requiresTwoFactor) {
+        setPendingTwoFactorToken(auth.tempToken);
+        setPendingTwoFactorEmail(authEmail.trim().toLowerCase());
+        setLoginOtpCode('');
+        setLoginOtpError('');
+        setAuthPassword('');
+        return;
+      }
     } catch (error) {
       setAuthError(error instanceof Error ? error.message : 'Auth failed');
     } finally {
       setAuthLoading(false);
+    }
+  }
+
+  async function handleTwoFactorLoginSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!pendingTwoFactorToken) {
+      return;
+    }
+
+    setLoginOtpLoading(true);
+    setLoginOtpError('');
+
+    try {
+      const auth = await api.loginWithTwoFactor(
+        pendingTwoFactorToken,
+        loginOtpCode,
+      );
+      persistAuth(auth);
+    } catch (error) {
+      setLoginOtpError(
+        error instanceof Error ? error.message : 'Could not verify your code',
+      );
+    } finally {
+      setLoginOtpLoading(false);
+    }
+  }
+
+  async function handleGenerateTwoFactor() {
+    if (!token) {
+      return;
+    }
+
+    setTwoFactorGenerating(true);
+    setTwoFactorError('');
+
+    try {
+      const setup = await api.generateTwoFactor(token);
+      setTwoFactorSetup(setup);
+      setTwoFactorCode('');
+    } catch (error) {
+      setTwoFactorError(
+        error instanceof Error
+          ? error.message
+          : 'Could not generate your two-factor setup',
+      );
+    } finally {
+      setTwoFactorGenerating(false);
+    }
+  }
+
+  async function handleEnableTwoFactor(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!token || !twoFactorSetup) {
+      return;
+    }
+
+    setTwoFactorEnabling(true);
+    setTwoFactorError('');
+
+    try {
+      await api.enableTwoFactor(token, twoFactorCode);
+      setUser((current) =>
+        current ? { ...current, twoFactorEnabled: true } : current,
+      );
+      setTwoFactorSetup(null);
+      setTwoFactorCode('');
+    } catch (error) {
+      setTwoFactorError(
+        error instanceof Error
+          ? error.message
+          : 'Could not enable two-factor authentication',
+      );
+    } finally {
+      setTwoFactorEnabling(false);
     }
   }
 
@@ -469,6 +655,63 @@ function App() {
     ...monthlyTrend.map((month) => month.amount),
     1,
   );
+  const themeIcon = getThemeIcon(themeMode);
+
+  if (pendingTwoFactorToken) {
+    return (
+      <div className="app-shell">
+        <div className="glow glow-a" />
+        <div className="glow glow-b" />
+
+        <main className="otp-shell">
+          <section className="panel otp-screen">
+            <p className="panel-kicker">Two-Factor Verification</p>
+            <h2>Enter your 6-digit code</h2>
+            <p className="muted-copy">
+              Finish signing in for {pendingTwoFactorEmail || 'your account'}.
+            </p>
+
+            <form className="stack" onSubmit={handleTwoFactorLoginSubmit}>
+              <input
+                autoComplete="one-time-code"
+                className="otp-input"
+                inputMode="numeric"
+                maxLength={6}
+                onChange={(event) =>
+                  setLoginOtpCode(normalizeOtpCode(event.target.value))
+                }
+                placeholder="000000"
+                value={loginOtpCode}
+              />
+
+              {loginOtpError ? <p className="error-text">{loginOtpError}</p> : null}
+
+              <button
+                className="primary-button"
+                disabled={loginOtpLoading || loginOtpCode.length !== 6}
+                type="submit"
+              >
+                {loginOtpLoading ? 'Verifying...' : 'Verify code'}
+              </button>
+
+              <button
+                className="ghost-button"
+                onClick={() => {
+                  setPendingTwoFactorToken(null);
+                  setPendingTwoFactorEmail('');
+                  setLoginOtpCode('');
+                  setLoginOtpError('');
+                }}
+                type="button"
+              >
+                Back to login
+              </button>
+            </form>
+          </section>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="app-shell">
@@ -477,7 +720,23 @@ function App() {
 
       <main className="layout">
         <section className="hero">
-          <p className="eyebrow">FinTrackr Dashboard</p>
+          <div className="hero-topbar">
+            <p className="eyebrow">FinTrackr Dashboard</p>
+            <button
+              aria-label={`Theme mode: ${themeMode}`}
+              className="theme-toggle"
+              onClick={() =>
+                setThemeMode((current) => {
+                  const currentIndex = themeModes.indexOf(current);
+                  return themeModes[(currentIndex + 1) % themeModes.length];
+                })
+              }
+              title={`Theme mode: ${themeMode}`}
+              type="button"
+            >
+              <span aria-hidden="true">{themeIcon}</span>
+            </button>
+          </div>
           <h1>
             Spend with clarity,
             <span> track with intent.</span>
@@ -497,14 +756,8 @@ function App() {
               <strong>${totalSpent.toFixed(2)}</strong>
             </article>
             <article>
-              <span>API</span>
-              <strong>
-                {
-                  new URL(
-                    import.meta.env.VITE_API_URL ?? 'http://localhost:3000',
-                  ).hostname
-                }
-              </strong>
+              <span>This month</span>
+              <strong>${currentMonthSpend.toFixed(2)}</strong>
             </article>
           </div>
         </section>
@@ -522,19 +775,85 @@ function App() {
           </div>
 
           {user ? (
-            <div className="session-card">
-              <div>
-                <p className="session-label">Signed in as</p>
-                <strong>{user.email}</strong>
+            <>
+              <div className="session-card">
+                <div className="session-meta">
+                  <p className="session-label">Signed in as</p>
+                  <div className="session-identity">
+                    <strong>{user.email}</strong>
+                    {user.twoFactorEnabled ? (
+                      <span className="twofa-badge">2FA Enabled ✓</span>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="session-actions">
+                  {!user.twoFactorEnabled ? (
+                    <button
+                      className="ghost-button"
+                      disabled={twoFactorGenerating || twoFactorEnabling}
+                      onClick={() => void handleGenerateTwoFactor()}
+                      type="button"
+                    >
+                      {twoFactorGenerating ? 'Generating...' : 'Enable 2FA'}
+                    </button>
+                  ) : null}
+
+                  <button
+                    className="ghost-button"
+                    onClick={handleLogout}
+                    type="button"
+                  >
+                    Log out
+                  </button>
+                </div>
               </div>
-              <button
-                className="ghost-button"
-                onClick={handleLogout}
-                type="button"
-              >
-                Log out
-              </button>
-            </div>
+
+              {twoFactorError ? <p className="error-text">{twoFactorError}</p> : null}
+
+              {!user.twoFactorEnabled && twoFactorSetup ? (
+                <section className="otp-screen">
+                  <p className="panel-kicker">Authenticator Setup</p>
+                  <h3>Scan the QR code</h3>
+                  <p className="muted-copy">
+                    Use your authenticator app, then enter the 6-digit code to
+                    enable two-factor authentication.
+                  </p>
+
+                  <img
+                    alt="Two-factor QR code"
+                    className="otp-qr"
+                    src={twoFactorSetup.qrCodeDataUrl}
+                  />
+
+                  <p className="session-label">
+                    Manual code: <strong>{twoFactorSetup.secret}</strong>
+                  </p>
+
+                  <form className="stack" onSubmit={handleEnableTwoFactor}>
+                    <input
+                      autoComplete="one-time-code"
+                      className="otp-input"
+                      inputMode="numeric"
+                      maxLength={6}
+                      onChange={(event) =>
+                        setTwoFactorCode(normalizeOtpCode(event.target.value))
+                      }
+                      placeholder="000000"
+                      value={twoFactorCode}
+                    />
+
+                    <button
+                      className="primary-button"
+                      disabled={twoFactorEnabling || twoFactorCode.length !== 6}
+                      type="submit"
+                    >
+                      {twoFactorEnabling ? 'Confirming...' : 'Verify and enable'}
+                    </button>
+                  </form>
+                </section>
+              ) : null}
+            </>
           ) : (
             <>
               <div className="mode-switch">
