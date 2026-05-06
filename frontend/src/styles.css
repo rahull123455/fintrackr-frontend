@@ -300,7 +300,7 @@ button {
   font-size: 0.82rem;
 }
 
-.otp-screen {
+.otp-setup {
   width: min(30rem, 100%);
   margin: 1rem auto 0;
   padding: 1.5rem;
@@ -313,24 +313,36 @@ button {
   border: 1px solid var(--border);
 }
 
-.otp-screen h2,
-.otp-screen h3 {
+.otp-setup h2,
+.otp-setup h3 {
   margin: 0;
 }
 
-.otp-qr {
-  width: min(15rem, 100%);
-  padding: 0.75rem;
-  border-radius: 20px;
-  background: #ffffff;
+.otp-screen {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 2rem;
+}
+
+.otp-card {
+  max-width: 420px;
+  width: 100%;
+  padding: 2rem;
 }
 
 .otp-input {
-  width: min(15rem, 100%);
+  width: 100%;
+  font-size: 2rem;
+  font-family: monospace;
+  letter-spacing: 0.75rem;
   text-align: center;
-  font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
-  font-size: clamp(1.4rem, 4vw, 2rem);
-  letter-spacing: 0.5rem;
+  padding: 0.75rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.05);
+  color: inherit;
+  box-sizing: border-box;
 }
 
 .twofa-badge {

@@ -5,13 +5,12 @@ import { SiteFooter } from './components/SiteFooter';
 import type {
   AiPredictionResponse,
   AiPredictionTrend,
-  AuthSuccessResponse,
+  AuthResponse,
   AuthUser,
   Expense,
   ExpenseInput,
   SavingsGoal,
   SavingsGoalInput,
-  TwoFactorSetupResponse,
 } from './types';
 
 const tokenStorageKey = 'fintrackr-token';
@@ -129,13 +128,10 @@ function App() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
-  const [pendingTwoFactorToken, setPendingTwoFactorToken] = useState<
-    string | null
-  >(null);
-  const [pendingTwoFactorEmail, setPendingTwoFactorEmail] = useState('');
-  const [loginOtpCode, setLoginOtpCode] = useState('');
-  const [loginOtpError, setLoginOtpError] = useState('');
-  const [loginOtpLoading, setLoginOtpLoading] = useState(false);
+  const [otpUserId, setOtpUserId] = useState<string | null>(null);
+  const [otpCode, setOtpCode] = useState('');
+  const [otpError, setOtpError] = useState('');
+  const [otpLoading, setOtpLoading] = useState(false);
   const [expenseForm, setExpenseForm] = useState({
     title: '',
     amount: '',
@@ -164,11 +160,10 @@ function App() {
   const [predictionError, setPredictionError] = useState('');
   const [predictionLoading, setPredictionLoading] = useState(false);
   const [predictionRefreshing, setPredictionRefreshing] = useState(false);
-  const [twoFactorSetup, setTwoFactorSetup] =
-    useState<TwoFactorSetupResponse | null>(null);
+  const [twoFactorSetupActive, setTwoFactorSetupActive] = useState(false);
   const [twoFactorCode, setTwoFactorCode] = useState('');
   const [twoFactorError, setTwoFactorError] = useState('');
-  const [twoFactorGenerating, setTwoFactorGenerating] = useState(false);
+  const [twoFactorSending, setTwoFactorSending] = useState(false);
   const [twoFactorEnabling, setTwoFactorEnabling] = useState(false);
 
   useEffect(() => {
@@ -327,16 +322,21 @@ function App() {
     };
   }, [bootstrapping, token, user]);
 
-  function persistAuth(auth: AuthSuccessResponse) {
+  function persistAuth(auth: AuthResponse) {
     window.localStorage.setItem(tokenStorageKey, auth.accessToken);
     setToken(auth.accessToken);
     setUser(auth.user);
     setAuthPassword('');
     setAuthError('');
-    setPendingTwoFactorToken(null);
-    setPendingTwoFactorEmail('');
-    setLoginOtpCode('');
-    setLoginOtpError('');
+    setOtpUserId(null);
+    setOtpCode('');
+    setOtpError('');
+    setOtpLoading(false);
+    setTwoFactorSetupActive(false);
+    setTwoFactorCode('');
+    setTwoFactorError('');
+    setTwoFactorSending(false);
+    setTwoFactorEnabling(false);
     setBootstrapping(true);
   }
 
@@ -352,14 +352,14 @@ function App() {
     setExpenseError('');
     setSavingsError('');
     setPredictionError('');
-    setPendingTwoFactorToken(null);
-    setPendingTwoFactorEmail('');
-    setLoginOtpCode('');
-    setLoginOtpError('');
-    setTwoFactorSetup(null);
+    setOtpUserId(null);
+    setOtpCode('');
+    setOtpError('');
+    setOtpLoading(false);
+    setTwoFactorSetupActive(false);
     setTwoFactorCode('');
     setTwoFactorError('');
-    setTwoFactorGenerating(false);
+    setTwoFactorSending(false);
     setTwoFactorEnabling(false);
     setBootstrapping(false);
   }
@@ -378,19 +378,15 @@ function App() {
 
       const auth = await api.login(authEmail, authPassword);
 
-      if ('accessToken' in auth) {
-        persistAuth(auth);
-        return;
-      }
-
-      if (auth.requiresTwoFactor) {
-        setPendingTwoFactorToken(auth.tempToken);
-        setPendingTwoFactorEmail(authEmail.trim().toLowerCase());
-        setLoginOtpCode('');
-        setLoginOtpError('');
+      if ('requiresOtp' in auth && auth.requiresOtp) {
+        setOtpUserId(auth.userId);
+        setOtpCode('');
+        setOtpError('');
         setAuthPassword('');
         return;
       }
+
+      persistAuth(auth as AuthResponse);
     } catch (error) {
       setAuthError(error instanceof Error ? error.message : 'Auth failed');
     } finally {
@@ -398,58 +394,53 @@ function App() {
     }
   }
 
-  async function handleTwoFactorLoginSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    if (!pendingTwoFactorToken) {
+  async function handleOtpVerify() {
+    if (!otpUserId) {
       return;
     }
 
-    setLoginOtpLoading(true);
-    setLoginOtpError('');
+    setOtpLoading(true);
+    setOtpError('');
 
     try {
-      const auth = await api.loginWithTwoFactor(
-        pendingTwoFactorToken,
-        loginOtpCode,
-      );
+      const auth = await api.verifyOtp(otpUserId, otpCode);
       persistAuth(auth);
+      setOtpUserId(null);
+      setOtpCode('');
     } catch (error) {
-      setLoginOtpError(
-        error instanceof Error ? error.message : 'Could not verify your code',
-      );
+      setOtpError(error instanceof Error ? error.message : 'Invalid OTP');
     } finally {
-      setLoginOtpLoading(false);
+      setOtpLoading(false);
     }
   }
 
-  async function handleGenerateTwoFactor() {
-    if (!token) {
+  async function handleSendSetupOtp() {
+    if (!user) {
       return;
     }
 
-    setTwoFactorGenerating(true);
+    setTwoFactorSending(true);
     setTwoFactorError('');
 
     try {
-      const setup = await api.generateTwoFactor(token);
-      setTwoFactorSetup(setup);
+      await api.resendOtp(user.id);
+      setTwoFactorSetupActive(true);
       setTwoFactorCode('');
     } catch (error) {
       setTwoFactorError(
         error instanceof Error
           ? error.message
-          : 'Could not generate your two-factor setup',
+          : 'Could not send your setup code',
       );
     } finally {
-      setTwoFactorGenerating(false);
+      setTwoFactorSending(false);
     }
   }
 
   async function handleEnableTwoFactor(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!token || !twoFactorSetup) {
+    if (!token) {
       return;
     }
 
@@ -457,11 +448,9 @@ function App() {
     setTwoFactorError('');
 
     try {
-      await api.enableTwoFactor(token, twoFactorCode);
-      setUser((current) =>
-        current ? { ...current, twoFactorEnabled: true } : current,
-      );
-      setTwoFactorSetup(null);
+      const response = await api.enableEmailOtp(token, twoFactorCode);
+      setUser(response.user);
+      setTwoFactorSetupActive(false);
       setTwoFactorCode('');
     } catch (error) {
       setTwoFactorError(
@@ -657,58 +646,47 @@ function App() {
   );
   const themeIcon = getThemeIcon(themeMode);
 
-  if (pendingTwoFactorToken) {
+  if (otpUserId) {
     return (
       <div className="app-shell">
         <div className="glow glow-a" />
         <div className="glow glow-b" />
 
-        <main className="otp-shell">
-          <section className="panel otp-screen">
-            <p className="panel-kicker">Two-Factor Verification</p>
-            <h2>Enter your 6-digit code</h2>
+        <div className="otp-screen">
+          <div className="panel otp-card">
+            <div className="panel-header">
+              <p className="panel-kicker">Two-Factor Auth</p>
+              <h2>Check your email</h2>
+            </div>
             <p className="muted-copy">
-              Finish signing in for {pendingTwoFactorEmail || 'your account'}.
+              We sent a 6-digit code to your email. Enter it below.
             </p>
-
-            <form className="stack" onSubmit={handleTwoFactorLoginSubmit}>
-              <input
-                autoComplete="one-time-code"
-                className="otp-input"
-                inputMode="numeric"
-                maxLength={6}
-                onChange={(event) =>
-                  setLoginOtpCode(normalizeOtpCode(event.target.value))
-                }
-                placeholder="000000"
-                value={loginOtpCode}
-              />
-
-              {loginOtpError ? <p className="error-text">{loginOtpError}</p> : null}
-
-              <button
-                className="primary-button"
-                disabled={loginOtpLoading || loginOtpCode.length !== 6}
-                type="submit"
-              >
-                {loginOtpLoading ? 'Verifying...' : 'Verify code'}
-              </button>
-
-              <button
-                className="ghost-button"
-                onClick={() => {
-                  setPendingTwoFactorToken(null);
-                  setPendingTwoFactorEmail('');
-                  setLoginOtpCode('');
-                  setLoginOtpError('');
-                }}
-                type="button"
-              >
-                Back to login
-              </button>
-            </form>
-          </section>
-        </main>
+            <input
+              className="otp-input"
+              maxLength={6}
+              onChange={(event) =>
+                setOtpCode(event.target.value.replace(/\D/g, ''))
+              }
+              placeholder="000000"
+              value={otpCode}
+            />
+            {otpError ? <p className="error-text">{otpError}</p> : null}
+            <button
+              className="primary-button"
+              disabled={otpCode.length !== 6 || otpLoading}
+              onClick={() => void handleOtpVerify()}
+            >
+              {otpLoading ? 'Verifying...' : 'Verify OTP'}
+            </button>
+            <button
+              className="ghost-button"
+              onClick={() => void api.resendOtp(otpUserId)}
+              type="button"
+            >
+              Resend code
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -791,11 +769,11 @@ function App() {
                   {!user.twoFactorEnabled ? (
                     <button
                       className="ghost-button"
-                      disabled={twoFactorGenerating || twoFactorEnabling}
-                      onClick={() => void handleGenerateTwoFactor()}
+                      disabled={twoFactorSending || twoFactorEnabling}
+                      onClick={() => void handleSendSetupOtp()}
                       type="button"
                     >
-                      {twoFactorGenerating ? 'Generating...' : 'Enable 2FA'}
+                      {twoFactorSending ? 'Sending...' : 'Enable 2FA'}
                     </button>
                   ) : null}
 
@@ -811,23 +789,13 @@ function App() {
 
               {twoFactorError ? <p className="error-text">{twoFactorError}</p> : null}
 
-              {!user.twoFactorEnabled && twoFactorSetup ? (
-                <section className="otp-screen">
-                  <p className="panel-kicker">Authenticator Setup</p>
-                  <h3>Scan the QR code</h3>
+              {!user.twoFactorEnabled && twoFactorSetupActive ? (
+                <section className="otp-setup">
+                  <p className="panel-kicker">Email OTP Setup</p>
+                  <h3>Check your inbox</h3>
                   <p className="muted-copy">
-                    Use your authenticator app, then enter the 6-digit code to
-                    enable two-factor authentication.
-                  </p>
-
-                  <img
-                    alt="Two-factor QR code"
-                    className="otp-qr"
-                    src={twoFactorSetup.qrCodeDataUrl}
-                  />
-
-                  <p className="session-label">
-                    Manual code: <strong>{twoFactorSetup.secret}</strong>
+                    We emailed a 6-digit code to {user.email}. Enter it below to
+                    turn on email-based two-factor authentication.
                   </p>
 
                   <form className="stack" onSubmit={handleEnableTwoFactor}>
@@ -849,6 +817,15 @@ function App() {
                       type="submit"
                     >
                       {twoFactorEnabling ? 'Confirming...' : 'Verify and enable'}
+                    </button>
+
+                    <button
+                      className="ghost-button"
+                      disabled={twoFactorSending || twoFactorEnabling}
+                      onClick={() => void handleSendSetupOtp()}
+                      type="button"
+                    >
+                      {twoFactorSending ? 'Sending...' : 'Resend code'}
                     </button>
                   </form>
                 </section>

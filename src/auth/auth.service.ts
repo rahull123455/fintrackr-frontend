@@ -7,22 +7,15 @@ import { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
 import { PrismaService } from '../prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
+import { OtpService } from './otp/otp.service';
 import { SignupDto } from './dto/signup.dto';
-import { TwoFactorLoginDto } from './two-factor/dto/two-factor-login.dto';
-import { TwoFactorService } from './two-factor/two-factor.service';
-
-type PendingTwoFactorPayload = {
-  email: string;
-  sub: string;
-  type: '2fa-pending';
-};
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
-    private readonly twoFactorService: TwoFactorService,
+    private readonly otpService: OtpService,
   ) {}
 
   getAuthStatus() {
@@ -72,52 +65,50 @@ export class AuthService {
     }
 
     if (user.twoFactorEnabled) {
-      return this.buildTwoFactorChallenge(user.id, user.email);
+      await this.otpService.generateOtp(user.id, user.email);
+
+      return {
+        requiresOtp: true as const,
+        userId: user.id,
+      };
     }
 
     return this.buildAuthResponse(user.id, user.email, user.twoFactorEnabled);
   }
 
-  async verifyTwoFactorLogin(twoFactorLoginDto: TwoFactorLoginDto) {
-    const payload = await this.getPendingTwoFactorPayload(
-      twoFactorLoginDto.tempToken,
-    );
-    const valid = await this.twoFactorService.verifyToken(
-      payload.sub,
-      twoFactorLoginDto.otpCode,
-    );
-
-    if (!valid) {
-      throw new UnauthorizedException('Invalid two-factor code');
-    }
+  async sendOtp(userId: string) {
+    const user = await this.findUserByIdOrThrow(userId);
+    await this.otpService.generateOtp(user.id, user.email);
 
     return {
-      valid: true,
+      message: 'OTP sent to your email',
     };
   }
 
-  async loginWithTwoFactor(twoFactorLoginDto: TwoFactorLoginDto) {
-    const payload = await this.getPendingTwoFactorPayload(
-      twoFactorLoginDto.tempToken,
-    );
-    const valid = await this.twoFactorService.verifyToken(
-      payload.sub,
-      twoFactorLoginDto.otpCode,
-    );
-
-    if (!valid) {
-      throw new UnauthorizedException('Invalid two-factor code');
-    }
-
-    const user = await this.prisma.user.findUnique({
-      where: { id: payload.sub },
-    });
-
-    if (!user) {
-      throw new UnauthorizedException('User not found');
-    }
+  async verifyOtpLogin(userId: string, code: string) {
+    const user = await this.findUserByIdOrThrow(userId);
+    await this.otpService.verifyOtp(user.id, code);
 
     return this.buildAuthResponse(user.id, user.email, user.twoFactorEnabled);
+  }
+
+  async enableOtp(userId: string, code: string) {
+    const user = await this.findUserByIdOrThrow(userId);
+    await this.otpService.verifyOtp(user.id, code);
+
+    const updatedUser = await this.prisma.user.update({
+      where: { id: user.id },
+      data: { twoFactorEnabled: true },
+    });
+
+    return {
+      success: true,
+      user: {
+        id: updatedUser.id,
+        email: updatedUser.email,
+        twoFactorEnabled: updatedUser.twoFactorEnabled,
+      },
+    };
   }
 
   async getMe(userId: string) {
@@ -158,41 +149,15 @@ export class AuthService {
     };
   }
 
-  private async buildTwoFactorChallenge(userId: string, email: string) {
-    const tempToken = await this.jwtService.signAsync(
-      {
-        sub: userId,
-        email,
-        type: '2fa-pending',
-      } satisfies PendingTwoFactorPayload,
-      {
-        expiresIn: '10m',
-      },
-    );
+  private async findUserByIdOrThrow(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
 
-    return {
-      requiresTwoFactor: true as const,
-      tempToken,
-    };
-  }
-
-  private async getPendingTwoFactorPayload(tempToken: string) {
-    try {
-      const payload = await this.jwtService.verifyAsync<PendingTwoFactorPayload>(
-        tempToken,
-      );
-
-      if (payload.type !== '2fa-pending') {
-        throw new UnauthorizedException('Invalid two-factor token');
-      }
-
-      return payload;
-    } catch (error) {
-      if (error instanceof UnauthorizedException) {
-        throw error;
-      }
-
-      throw new UnauthorizedException('Invalid or expired two-factor token');
+    if (!user) {
+      throw new UnauthorizedException('User not found');
     }
+
+    return user;
   }
 }

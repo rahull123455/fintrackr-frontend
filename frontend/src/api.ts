@@ -10,8 +10,8 @@ import type {
   ExpenseInput,
   SavingsGoal,
   SavingsGoalInput,
-  TwoFactorSetupResponse,
-  TwoFactorVerifyResponse,
+  SendOtpResponse,
+  EnableOtpResponse,
 } from './types';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
@@ -67,36 +67,28 @@ export const api = {
     });
   },
 
-  generateTwoFactor(token: string) {
-    return request<TwoFactorSetupResponse>(
-      '/auth/2fa/generate',
-      { method: 'POST' },
-      token,
-    );
+  resendOtp(userId: string) {
+    return request<SendOtpResponse>('/auth/otp/send', {
+      method: 'POST',
+      body: JSON.stringify({ userId }),
+    });
   },
 
-  enableTwoFactor(token: string, otpCode: string) {
-    return request<{ success: boolean }>(
-      '/auth/2fa/enable',
+  enableEmailOtp(token: string, code: string) {
+    return request<EnableOtpResponse>(
+      '/auth/otp/enable',
       {
         method: 'POST',
-        body: JSON.stringify({ otpCode }),
+        body: JSON.stringify({ code }),
       },
       token,
     );
   },
 
-  verifyTwoFactor(tempToken: string, otpCode: string) {
-    return request<TwoFactorVerifyResponse>('/auth/2fa/verify', {
+  verifyOtp(userId: string, code: string) {
+    return request<AuthResponse>('/auth/otp/verify', {
       method: 'POST',
-      body: JSON.stringify({ otpCode, tempToken }),
-    });
-  },
-
-  loginWithTwoFactor(tempToken: string, otpCode: string) {
-    return request<AuthResponse>('/auth/2fa/login', {
-      method: 'POST',
-      body: JSON.stringify({ otpCode, tempToken }),
+      body: JSON.stringify({ userId, code }),
     });
   },
 

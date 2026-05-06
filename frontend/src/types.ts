@@ -11,23 +11,22 @@ export type AuthSuccessResponse = {
   user: AuthUser;
 };
 
-export type TwoFactorChallengeResponse = {
-  requiresTwoFactor: true;
-  tempToken: string;
+export type OtpChallengeResponse = {
+  requiresOtp: true;
+  userId: string;
 };
 
 export type AuthResponse = AuthSuccessResponse;
 
-export type LoginResponse = AuthSuccessResponse | TwoFactorChallengeResponse;
+export type LoginResponse = AuthSuccessResponse | OtpChallengeResponse;
 
-export type TwoFactorSetupResponse = {
-  otpauthUrl: string;
-  qrCodeDataUrl: string;
-  secret: string;
+export type SendOtpResponse = {
+  message: string;
 };
 
-export type TwoFactorVerifyResponse = {
-  valid: boolean;
+export type EnableOtpResponse = {
+  success: boolean;
+  user: AuthUser;
 };
 
 export type Expense = {

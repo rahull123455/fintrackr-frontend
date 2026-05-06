@@ -3,9 +3,9 @@ import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { OtpController } from './otp/otp.controller';
+import { OtpService } from './otp/otp.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
-import { TwoFactorController } from './two-factor/two-factor.controller';
-import { TwoFactorService } from './two-factor/two-factor.service';
 
 @Module({
   imports: [
@@ -15,7 +15,7 @@ import { TwoFactorService } from './two-factor/two-factor.service';
       signOptions: { expiresIn: '1h' },
     }),
   ],
-  controllers: [AuthController, TwoFactorController],
-  providers: [AuthService, JwtStrategy, TwoFactorService],
+  controllers: [AuthController, OtpController],
+  providers: [AuthService, JwtStrategy, OtpService],
 })
 export class AuthModule {}
