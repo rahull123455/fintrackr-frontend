@@ -498,7 +498,13 @@ function App() {
             </article>
             <article>
               <span>API</span>
-              <strong>https://fintrackr-backend-kojd.onrender.com</strong>
+              <strong>
+                {
+                  new URL(
+                    import.meta.env.VITE_API_URL ?? 'http://localhost:3000',
+                  ).hostname
+                }
+              </strong>
             </article>
           </div>
         </section>
