@@ -6,9 +6,11 @@ import { AuthService } from './auth.service';
 import { OtpController } from './otp/otp.controller';
 import { OtpService } from './otp/otp.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { PrismaModule } from '../prisma/prisma.module';
 
 @Module({
   imports: [
+    PrismaModule,
     PassportModule,
     JwtModule.register({
       secret: process.env.JWT_SECRET ?? 'dev-jwt-secret',
