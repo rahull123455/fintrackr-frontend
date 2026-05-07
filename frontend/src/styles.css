@@ -225,7 +225,7 @@ button {
 .metric-strip {
   display: grid;
   gap: 1rem;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .metric-strip article {
@@ -476,7 +476,7 @@ textarea:disabled {
 .analytics-grid {
   display: grid;
   gap: 1rem;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .analytics-card,
@@ -488,6 +488,16 @@ textarea:disabled {
 
 .analytics-card {
   padding: 1rem 1.1rem;
+  overflow: hidden;
+}
+
+.analytics-card strong,
+.analytics-card span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
+  max-width: 100%;
 }
 
 .analytics-label,
@@ -786,6 +796,89 @@ textarea:disabled {
 
 .expense-side strong {
   font-size: 1.1rem;
+}
+
+/* New styles */
+.budget-alert {
+  padding: 1rem 1.2rem;
+  border-radius: 18px;
+  background: rgba(255, 133, 112, 0.12);
+  border: 1px solid rgba(255, 133, 112, 0.35);
+  color: var(--danger);
+  font-weight: 600;
+  margin-bottom: 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.search-input {
+  width: 100%;
+  border: 1px solid var(--border);
+  background: var(--input);
+  color: var(--text);
+  border-radius: 16px;
+  padding: 0.85rem 1rem;
+  outline: none;
+  transition: border-color 180ms ease, transform 180ms ease;
+  margin-bottom: 1.25rem;
+}
+
+.search-input:focus {
+  border-color: rgba(255, 146, 100, 0.8);
+  transform: translateY(-1px);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.badge-food {
+  background: rgba(255, 107, 107, 0.15);
+  color: #ff6b6b;
+  border: 1px solid rgba(255, 107, 107, 0.3);
+}
+
+.badge-travel {
+  background: rgba(78, 205, 196, 0.15);
+  color: #4ecdc4;
+  border: 1px solid rgba(78, 205, 196, 0.3);
+}
+
+.badge-shopping {
+  background: rgba(255, 209, 125, 0.15);
+  color: #ffd17d;
+  border: 1px solid rgba(255, 209, 125, 0.3);
+}
+
+.badge-bills {
+  background: rgba(167, 139, 250, 0.15);
+  color: #a78bfa;
+  border: 1px solid rgba(167, 139, 250, 0.3);
+}
+
+.badge-health {
+  background: rgba(52, 211, 153, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(52, 211, 153, 0.3);
+}
+
+.badge-work {
+  background: rgba(96, 165, 250, 0.15);
+  color: #60a5fa;
+  border: 1px solid rgba(96, 165, 250, 0.3);
+}
+
+.badge-other {
+  background: rgba(156, 163, 175, 0.15);
+  color: #9ca3af;
+  border: 1px solid rgba(156, 163, 175, 0.3);
 }
 
 .site-footer {
