@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { api } from './api';
 import { FinanceChatbot } from './components/FinanceChatbot';
 import { SiteFooter } from './components/SiteFooter';
@@ -28,6 +28,15 @@ const categories = [
   'Work',
   'Other',
 ];
+
+// INR formatter
+function formatINR(amount: number): string {
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
 
 function toLocalDateTimeValue(date = new Date()) {
   const offset = date.getTimezoneOffset();
@@ -165,6 +174,9 @@ function App() {
   const [twoFactorError, setTwoFactorError] = useState('');
   const [twoFactorSending, setTwoFactorSending] = useState(false);
   const [twoFactorEnabling, setTwoFactorEnabling] = useState(false);
+
+  // Search state
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     window.localStorage.setItem(themeStorageKey, themeMode);
@@ -362,6 +374,7 @@ function App() {
     setTwoFactorSending(false);
     setTwoFactorEnabling(false);
     setBootstrapping(false);
+    setSearch('');
   }
 
   async function handleAuthSubmit(event: FormEvent<HTMLFormElement>) {
@@ -601,6 +614,7 @@ function App() {
     }
   }
 
+  // Computed analytics
   const totalSpent = expenses.reduce((sum, expense) => sum + expense.amount, 0);
   const averageSpend = expenses.length ? totalSpent / expenses.length : 0;
   const now = new Date();
@@ -611,6 +625,22 @@ function App() {
       spentAt.getFullYear() === now.getFullYear();
     return sameMonth ? sum + expense.amount : sum;
   }, 0);
+
+  // Average monthly spending (for budget alert)
+  const months = useMemo(() => {
+    const monthSet = new Set<string>();
+    expenses.forEach(e => {
+      const d = new Date(e.spentAt);
+      monthSet.add(`${d.getFullYear()}-${d.getMonth()}`);
+    });
+    return Math.max(monthSet.size, 1);
+  }, [expenses]);
+
+  const averageMonthly = totalSpent / months;
+
+  // Budget alert - spending exceeds 120% of average
+  const budgetExceeded = months > 0 && currentMonthSpend > averageMonthly * 1.2;
+
   const categorySummary = Object.entries(
     expenses.reduce<Record<string, number>>((accumulator, expense) => {
       accumulator[expense.category] =
@@ -618,7 +648,7 @@ function App() {
       return accumulator;
     }, {}),
   )
-    .map(([category, amount]) => ({
+    .map(({ category, amount }) => ({
       category,
       amount,
       share: totalSpent ? (amount / totalSpent) * 100 : 0,
@@ -645,6 +675,18 @@ function App() {
     1,
   );
   const themeIcon = getThemeIcon(themeMode);
+
+  // Filtered expenses for search
+  const filteredExpenses = useMemo(() => {
+    if (!search.trim()) return expenses;
+    const q = search.toLowerCase();
+    return expenses.filter(
+      e =>
+        e.title.toLowerCase().includes(q) ||
+        e.category.toLowerCase().includes(q) ||
+        (e.note && e.note.toLowerCase().includes(q)),
+    );
+  }, [expenses, search]);
 
   if (otpUserId) {
     return (
@@ -731,11 +773,11 @@ function App() {
             </article>
             <article>
               <span>Total spent</span>
-              <strong>${totalSpent.toFixed(2)}</strong>
+              <strong>{formatINR(totalSpent)}</strong>
             </article>
             <article>
               <span>This month</span>
-              <strong>${currentMonthSpend.toFixed(2)}</strong>
+              <strong>{formatINR(currentMonthSpend)}</strong>
             </article>
           </div>
         </section>
@@ -1017,14 +1059,21 @@ function App() {
             </p>
           ) : (
             <div className="analytics-stack">
+              {/* Budget alert */}
+              {budgetExceeded && (
+                <div className="budget-alert">
+                  This month's spending ({formatINR(currentMonthSpend)}) exceeds 120% of your monthly average ({formatINR(averageMonthly)}). Review your expenses!
+                </div>
+              )}
+
               <div className="analytics-grid">
                 <article className="analytics-card">
                   <span className="analytics-label">This month</span>
-                  <strong>${currentMonthSpend.toFixed(2)}</strong>
+                  <strong>{formatINR(currentMonthSpend)}</strong>
                 </article>
                 <article className="analytics-card">
                   <span className="analytics-label">Average expense</span>
-                  <strong>${averageSpend.toFixed(2)}</strong>
+                  <strong>{formatINR(averageSpend)}</strong>
                 </article>
                 <article className="analytics-card">
                   <span className="analytics-label">Top category</span>
@@ -1044,7 +1093,7 @@ function App() {
                       <div className="bar-row" key={item.category}>
                         <div className="bar-copy">
                           <span>{item.category}</span>
-                          <strong>${item.amount.toFixed(2)}</strong>
+                          <strong>{formatINR(item.amount)}</strong>
                         </div>
                         <div className="bar-track">
                           <div
@@ -1075,7 +1124,9 @@ function App() {
                             )}px`,
                           }}
                         >
-                          <span>${month.amount.toFixed(0)}</span>
+                          {month.amount > 0 && (
+                            <span>{formatINR(month.amount).replace('₹', '')}</span>
+                          )}
                         </div>
                         <label>{month.label}</label>
                       </div>
@@ -1121,7 +1172,7 @@ function App() {
                     Predicted total for {formatPredictionMonth(prediction.month)}
                   </p>
                   <strong className="prediction-total">
-                    ${prediction.predictedTotal.toFixed(2)}
+                    {formatINR(prediction.predictedTotal)}
                   </strong>
                   <p className="prediction-summary">{prediction.summary}</p>
                 </div>
@@ -1173,7 +1224,7 @@ function App() {
                               <span>{category.category}</span>
                             </div>
                             <strong>
-                              ${category.predictedAmount.toFixed(2)}
+                              {formatINR(category.predictedAmount)}
                             </strong>
                           </div>
 
@@ -1249,8 +1300,7 @@ function App() {
                       <div>
                         <p className="expense-title">{goal.name}</p>
                         <p className="expense-meta">
-                          ${goal.savedAmount.toFixed(2)} saved of $
-                          {goal.targetAmount.toFixed(2)}
+                          {formatINR(goal.savedAmount)} saved of {formatINR(goal.targetAmount)}
                         </p>
                       </div>
 
@@ -1283,11 +1333,11 @@ function App() {
                     <div className="savings-meta-grid">
                       <div>
                         <span>Remaining</span>
-                        <strong>${goal.remaining.toFixed(2)}</strong>
+                        <strong>{formatINR(goal.remaining)}</strong>
                       </div>
                       <div>
                         <span>Monthly contribution</span>
-                        <strong>${goal.monthlyContribution.toFixed(2)}</strong>
+                        <strong>{formatINR(goal.monthlyContribution)}</strong>
                       </div>
                       <div>
                         <span>Months to goal</span>
@@ -1412,34 +1462,54 @@ function App() {
           ) : expenses.length === 0 ? (
             <p className="muted-copy">No expenses yet. Add your first record.</p>
           ) : (
-            <div className="expense-list">
-              {expenses.map((expense) => (
-                <article className="expense-card" key={expense.id}>
-                  <div className="expense-main">
-                    <div>
-                      <p className="expense-title">{expense.title}</p>
-                      <p className="expense-meta">
-                        {expense.category} |{' '}
-                        {new Date(expense.spentAt).toLocaleString()}
-                      </p>
-                      {expense.note ? (
-                        <p className="expense-note">{expense.note}</p>
-                      ) : null}
-                    </div>
-                    <div className="expense-side">
-                      <strong>${expense.amount.toFixed(2)}</strong>
-                      <button
-                        className="ghost-button"
-                        onClick={() => void handleDeleteExpense(expense.id)}
-                        type="button"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                </article>
-              ))}
-            </div>
+            <>
+              {/* Search input */}
+              <input
+                type="text"
+                className="search-input"
+                placeholder="Search expenses by title, category, or note..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+
+              {/* Filtered expense list */}
+              {filteredExpenses.length === 0 ? (
+                <div className="no-results">
+                  {search.trim() ? 'No expenses match your search.' : ''}
+                </div>
+              ) : (
+                <div className="expense-list">
+                  {filteredExpenses.map((expense) => (
+                    <article className="expense-card" key={expense.id}>
+                      <div className="expense-main">
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <p className="expense-title">{expense.title}</p>
+                          <p className="expense-meta">
+                            {new Date(expense.spentAt).toLocaleString()}
+                          </p>
+                          {expense.note ? (
+                            <p className="expense-note">{expense.note}</p>
+                          ) : null}
+                        </div>
+                        <div className="expense-side">
+                          <span className={`badge badge-${expense.category.toLowerCase()}`}>
+                            {expense.category}
+                          </span>
+                          <strong>{formatINR(expense.amount)}</strong>
+                          <button
+                            className="ghost-button"
+                            onClick={() => void handleDeleteExpense(expense.id)}
+                            type="button"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </section>
       </main>
