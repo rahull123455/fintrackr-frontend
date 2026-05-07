@@ -1,7 +1,9 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from './api';
 import { FinanceChatbot } from './components/FinanceChatbot';
 import { SiteFooter } from './components/SiteFooter';
+import { AnalyticsCharts } from './components/AnalyticsCharts';
+import { exportExpensesPDF } from './utils/exportPDF';
 import type {
   AiPredictionResponse,
   AiPredictionTrend,
@@ -177,6 +179,7 @@ function App() {
 
   // Search state
   const [search, setSearch] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     window.localStorage.setItem(themeStorageKey, themeMode);
@@ -333,6 +336,31 @@ function App() {
       cancelled = true;
     };
   }, [bootstrapping, token, user]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Ctrl+K / Cmd+K - Focus search
+      if ((event.ctrlKey || event.metaKey) && event.key === 'k') {
+        event.preventDefault();
+        searchInputRef.current?.focus();
+      }
+      // Ctrl+N / Cmd+N - Focus new expense title
+      if ((event.ctrlKey || event.metaKey) && event.key === 'n') {
+        event.preventDefault();
+        const titleInput = document.querySelector<HTMLInputElement>('input[placeholder="Groceries"]');
+        titleInput?.focus();
+      }
+      // Escape - Clear search
+      if (event.key === 'Escape' && document.activeElement === searchInputRef.current) {
+        setSearch('');
+        searchInputRef.current?.blur();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   function persistAuth(auth: AuthResponse) {
     window.localStorage.setItem(tokenStorageKey, auth.accessToken);
@@ -641,7 +669,7 @@ function App() {
   // Budget alert - spending exceeds 120% of average
   const budgetExceeded = months > 0 && currentMonthSpend > averageMonthly * 1.2;
 
-    const categorySummary = Object.entries(
+  const categorySummary = Object.entries(
     expenses.reduce<Record<string, number>>((accumulator, expense) => {
       accumulator[expense.category] =
         (accumulator[expense.category] ?? 0) + expense.amount;
@@ -1134,6 +1162,9 @@ function App() {
                   </div>
                 </div>
               </div>
+
+              {/* Interactive Charts */}
+              <AnalyticsCharts expenses={expenses} formatINR={formatINR} />
             </div>
           )}
         </section>
@@ -1451,6 +1482,13 @@ function App() {
           <div className="panel-header">
             <p className="panel-kicker">Expense Ledger</p>
             <h2>Recent spending</h2>
+            <button 
+              className="ghost-button" 
+              onClick={() => exportExpensesPDF(expenses)}
+              style={{ marginLeft: 'auto' }}
+            >
+              📥 Export PDF
+            </button>
           </div>
 
           {bootstrapping ? (
@@ -1465,9 +1503,10 @@ function App() {
             <>
               {/* Search input */}
               <input
+                ref={searchInputRef}
                 type="text"
                 className="search-input"
-                placeholder="Search expenses by title, category, or note..."
+                placeholder="Search expenses (Ctrl+K to focus)..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
