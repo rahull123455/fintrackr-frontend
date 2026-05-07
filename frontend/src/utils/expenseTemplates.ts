@@ -1,4 +1,3 @@
-// src/utils/expenseTemplates.ts
 export interface ExpenseTemplate {
   id: string;
   title: string;
@@ -20,8 +19,4 @@ export const defaultTemplates: ExpenseTemplate[] = [
 export function getStoredTemplates(): ExpenseTemplate[] {
   const stored = localStorage.getItem('fintrackr_templates');
   return stored ? JSON.parse(stored) : defaultTemplates;
-}
-
-export function saveTemplates(templates: ExpenseTemplate[]) {
-  localStorage.setItem('fintrackr_templates', JSON.stringify(templates));
 }

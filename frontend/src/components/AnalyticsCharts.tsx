@@ -2,6 +2,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, 
   ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend
 } from 'recharts';
+import type { PieLabelRenderProps } from 'recharts';
 import { Expense } from '../types';
 
 const COLORS = ['#ff9264', '#6ce3cf', '#ffd17d', '#a78bfa', '#60a5fa', '#f472b6', '#9ca3af'];
@@ -12,11 +13,20 @@ interface AnalyticsChartsProps {
 }
 
 export function AnalyticsCharts({ expenses, formatINR }: AnalyticsChartsProps) {
-  // Monthly trend data
   const monthlyData = getMonthlyTrend(expenses);
-  
-  // Category distribution
   const categoryData = getCategoryData(expenses);
+
+  // Tooltip formatter
+  const tooltipFormatter = (value: any) => {
+    return [formatINR(Number(value)), 'Amount'] as [string, string];
+  };
+
+  // Pie label renderer - fixed TypeScript types
+  const renderPieLabel = (props: PieLabelRenderProps) => {
+    const { name, percent } = props;
+    if (name === undefined || percent === undefined) return '';
+    return `${name} ${(percent * 100).toFixed(0)}%`;
+  };
 
   return (
     <div style={{ display: 'grid', gap: '1.5rem', marginTop: '1.5rem' }}>
@@ -29,7 +39,7 @@ export function AnalyticsCharts({ expenses, formatINR }: AnalyticsChartsProps) {
             <XAxis dataKey="month" stroke="#c6b8a5" />
             <YAxis stroke="#c6b8a5" tickFormatter={(v) => `₹${v}`} />
             <Tooltip 
-              formatter={(value: number) => [formatINR(value), 'Amount']}
+              formatter={tooltipFormatter}
               contentStyle={{ background: '#1f1a16', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px' }}
             />
             <Bar dataKey="amount" fill="#ff9264" radius={[8, 8, 0, 0]} />
@@ -50,13 +60,14 @@ export function AnalyticsCharts({ expenses, formatINR }: AnalyticsChartsProps) {
               outerRadius={100}
               paddingAngle={5}
               dataKey="amount"
-              label={({ category, percent }) => `${category} ${(percent * 100).toFixed(0)}%`}
+              nameKey="category"
+              label={renderPieLabel}
             >
-              {categoryData.map((entry, index) => (
+              {categoryData.map((_, index) => (
                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
               ))}
             </Pie>
-            <Tooltip formatter={(value: number) => [formatINR(value), 'Amount']} />
+            <Tooltip formatter={tooltipFormatter} />
             <Legend />
           </PieChart>
         </ResponsiveContainer>
@@ -71,7 +82,7 @@ export function AnalyticsCharts({ expenses, formatINR }: AnalyticsChartsProps) {
             <XAxis dataKey="month" stroke="#c6b8a5" />
             <YAxis stroke="#c6b8a5" tickFormatter={(v) => `₹${v}`} />
             <Tooltip 
-              formatter={(value: number) => [formatINR(value), 'Amount']}
+              formatter={tooltipFormatter}
               contentStyle={{ background: '#1f1a16', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px' }}
             />
             <Line type="monotone" dataKey="amount" stroke="#6ce3cf" strokeWidth={3} dot={{ fill: '#6ce3cf', r: 6 }} />
@@ -102,10 +113,10 @@ function getMonthlyTrend(expenses: Expense[]) {
 }
 
 function getCategoryData(expenses: Expense[]) {
-  const totals = expenses.reduce((acc, exp) => {
+  const totals = expenses.reduce((acc: Record<string, number>, exp) => {
     acc[exp.category] = (acc[exp.category] || 0) + exp.amount;
     return acc;
-  }, {} as Record<string, number>);
+  }, {});
   
   return Object.entries(totals).map(([category, amount]) => ({ category, amount }));
 }

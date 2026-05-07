@@ -1,9 +1,8 @@
-// src/types/budget.ts
 export interface Budget {
   id: string;
   category: string;
   monthlyLimit: number;
-  alertThreshold: number; // percentage (e.g., 80 means alert at 80%)
+  alertThreshold: number;
   createdAt: string;
 }
 

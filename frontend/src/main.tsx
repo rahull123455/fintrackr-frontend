@@ -1,14 +1,10 @@
-import React from 'react';
-import ReactDOM from 'react-dom/client';
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import { Toaster } from 'react-hot-toast';
 import App from './App';
 import './styles.css';
-import { Toaster } from 'react-hot-toast';
 
-
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <App />
-    root.render(
+createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />
     <Toaster 
@@ -28,6 +24,4 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       }}
     />
   </StrictMode>
-);
-  </React.StrictMode>,
 );

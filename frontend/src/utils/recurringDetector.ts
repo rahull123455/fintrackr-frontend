@@ -1,6 +1,6 @@
 import { Expense } from '../types';
 
-interface RecurringPattern {
+export interface RecurringPattern {
   title: string;
   category: string;
   averageAmount: number;
@@ -8,7 +8,7 @@ interface RecurringPattern {
   occurrences: Date[];
   lastDate: Date;
   nextPredicted: Date;
-  confidence: number; // 0-100
+  confidence: number;
 }
 
 export function detectRecurringExpenses(expenses: Expense[]): RecurringPattern[] {
@@ -22,7 +22,7 @@ export function detectRecurringExpenses(expenses: Expense[]): RecurringPattern[]
       new Date(a.spentAt).getTime() - new Date(b.spentAt).getTime()
     );
     
-    const intervals = [];
+    const intervals: number[] = [];
     for (let i = 1; i < sortedExps.length; i++) {
       const days = daysBetween(
         new Date(sortedExps[i-1].spentAt),
@@ -59,12 +59,12 @@ export function detectRecurringExpenses(expenses: Expense[]): RecurringPattern[]
 }
 
 function groupByTitle(expenses: Expense[]): Record<string, Expense[]> {
-  return expenses.reduce((acc, exp) => {
+  return expenses.reduce((acc: Record<string, Expense[]>, exp) => {
     const normalized = exp.title.toLowerCase().trim();
     if (!acc[normalized]) acc[normalized] = [];
     acc[normalized].push(exp);
     return acc;
-  }, {} as Record<string, Expense[]>);
+  }, {});
 }
 
 function daysBetween(date1: Date, date2: Date): number {
@@ -99,17 +99,12 @@ function calculateConfidence(
 ): number {
   if (intervals.length < 2) return 0;
   
-  // Interval consistency (lower std dev = higher score)
   const stdDev = Math.sqrt(
     intervals.reduce((sum, i) => sum + Math.pow(i - avgInterval, 2), 0) / intervals.length
   );
   const intervalScore = Math.max(0, 100 - (stdDev / avgInterval) * 50);
-  
-  // Amount consistency
   const amountScore = amountVariance < avgAmount * 0.3 ? 100 : 
     amountVariance < avgAmount * 0.5 ? 70 : 40;
-  
-  // Number of occurrences
   const occurrenceScore = Math.min(100, intervals.length * 25);
   
   return Math.round((intervalScore + amountScore + occurrenceScore) / 3);

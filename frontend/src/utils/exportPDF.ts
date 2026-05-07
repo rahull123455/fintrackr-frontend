@@ -58,10 +58,10 @@ export function exportExpensesPDF(expenses: Expense[]) {
   });
   
   // Category Summary
-  const categoryTotals = expenses.reduce((acc, exp) => {
+  const categoryTotals = expenses.reduce((acc: Record<string, number>, exp) => {
     acc[exp.category] = (acc[exp.category] || 0) + exp.amount;
     return acc;
-  }, {} as Record<string, number>);
+  }, {});
   
   const finalY = (doc as any).lastAutoTable.finalY + 10;
   
