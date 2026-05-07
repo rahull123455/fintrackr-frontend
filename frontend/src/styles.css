@@ -1,3 +1,6 @@
+Here is the complete, updated `style.css` file with your FIX 4 rules appended at the bottom. CSS cascade will ensure the new rules override the earlier definitions where they conflict, exactly as intended.
+
+```css
 :root {
   font-family: 'Space Grotesk', sans-serif;
   --bg:
@@ -1969,3 +1972,71 @@ textarea:disabled {
     justify-content: center;
   }
 }
+
+/* FIX 4 — Add these styles to bottom of styles.css */
+/* EXPORT BUTTON */
+.export-btn {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+/* AI INSIGHTS LIGHT MODE FIX */
+[data-theme='light'] .prediction-item,
+[data-theme='light'] .prediction-hero,
+[data-theme='light'] .prediction-insights,
+[data-theme='light'] .chart-card,
+[data-theme='light'] .analytics-card {
+  background: rgba(255,255,255,0.95);
+  color: #111;
+}
+
+/* PREDICTION ICON FIX */
+.prediction-trend-arrow {
+  width: 2rem;
+  height: 2rem;
+  min-width: 2rem;
+  min-height: 2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+/* SEARCH BAR */
+.search-input {
+  width: 100%;
+  padding: 0.8rem 1rem;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--input);
+  color: var(--text);
+  margin-bottom: 1rem;
+}
+
+/* LIGHT MODE SEARCH */
+[data-theme='light'] .search-input {
+  background: rgba(0,0,0,0.03);
+  color: #111;
+}
+
+/* BUDGET ALERT */
+.budget-alert {
+  background: rgba(255, 209, 125, 0.12);
+  border: 1px solid rgba(255, 209, 125, 0.3);
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+  color: #ffd17d;
+  margin-bottom: 1rem;
+}
+
+/* LIGHT MODE BUDGET ALERT */
+[data-theme='light'] .budget-alert {
+  background: rgba(255, 209, 125, 0.2);
+  color: #7a5200;
+}
+```

@@ -69,11 +69,11 @@ function formatPredictionMonth(month: string) {
 function getTrendArrow(trend: AiPredictionTrend) {
   switch (trend) {
     case 'increasing':
-      return '↑';
+      return '▲';
     case 'decreasing':
-      return '↓';
+      return '▼';
     default:
-      return '→';
+      return '●';
   }
 }
 
@@ -836,17 +836,7 @@ function App() {
                 </div>
 
                 <div className="session-actions">
-                  {!user.twoFactorEnabled ? (
-                    <button
-                      className="ghost-button"
-                      disabled={twoFactorSending || twoFactorEnabling}
-                      onClick={() => void handleSendSetupOtp()}
-                      type="button"
-                    >
-                      {twoFactorSending ? 'Sending...' : 'Enable 2FA'}
-                    </button>
-                  ) : null}
-
+                 
                   <button
                     className="ghost-button"
                     onClick={handleLogout}
@@ -1482,13 +1472,13 @@ function App() {
           <div className="panel-header">
             <p className="panel-kicker">Expense Ledger</p>
             <h2>Recent spending</h2>
-            <button 
-              className="ghost-button" 
+            <button
+              className="ghost-button export-btn"
               onClick={() => exportExpensesPDF(expenses)}
-              style={{ marginLeft: 'auto' }}
-            >
+                type="button"
+>
               📥 Export PDF
-            </button>
+        </button>
           </div>
 
           {bootstrapping ? (
