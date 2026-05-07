@@ -641,14 +641,14 @@ function App() {
   // Budget alert - spending exceeds 120% of average
   const budgetExceeded = months > 0 && currentMonthSpend > averageMonthly * 1.2;
 
-  const categorySummary = Object.entries(
+    const categorySummary = Object.entries(
     expenses.reduce<Record<string, number>>((accumulator, expense) => {
       accumulator[expense.category] =
         (accumulator[expense.category] ?? 0) + expense.amount;
       return accumulator;
     }, {}),
   )
-    .map(({ category, amount }) => ({
+    .map(([category, amount]) => ({
       category,
       amount,
       share: totalSpent ? (amount / totalSpent) * 100 : 0,
